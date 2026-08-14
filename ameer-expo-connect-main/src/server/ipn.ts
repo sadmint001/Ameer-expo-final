@@ -1,6 +1,11 @@
-import { getPesapalToken } from "./pesapal";
+import { getPesapalToken, PESAPAL_BASE_URL } from "./pesapal";
 import { supabaseAdmin } from "../lib/supabase-server";
-import { sendRegistrationNotification } from "../lib/notify";
+import {
+  sendRegistrationNotification,
+  sendRegistrantConfirmation,
+  sendPaymentReceivedEmail,
+} from "../lib/notify";
+import { generateTicketNumber, generateTicketQrPng } from "../lib/ticket";
 
 export async function handleIpn(request: Request) {
   try {
@@ -8,7 +13,7 @@ export async function handleIpn(request: Request) {
     let orderTrackingId = url.searchParams.get("OrderTrackingId");
     let merchantReference = url.searchParams.get("OrderMerchantReference");
 
-    // Fallback to body if not in query
+    // Fallback to body if not in query.
     if (!orderTrackingId && request.method === "POST") {
       try {
         const body = await request.json();
@@ -27,7 +32,7 @@ export async function handleIpn(request: Request) {
     const token = await getPesapalToken();
 
     // 2. Check status
-    const statusUrl = `https://cybqa.pesapal.com/pesapalv3/api/Transactions/GetTransactionStatus?orderTrackingId=${orderTrackingId}`;
+    const statusUrl = `${PESAPAL_BASE_URL}/Transactions/GetTransactionStatus?orderTrackingId=${orderTrackingId}`;
     const statusReq = await fetch(statusUrl, {
       headers: {
         Accept: "application/json",
@@ -52,7 +57,9 @@ export async function handleIpn(request: Request) {
 
     if (findError) {
       console.error("IPN Supabase lookup error:", findError);
-      return new Response(JSON.stringify({ error: "Failed to lookup registration" }), { status: 500 });
+      return new Response(JSON.stringify({ error: "Failed to lookup registration" }), {
+        status: 500,
+      });
     }
 
     if (!existingRow) {
@@ -61,10 +68,44 @@ export async function handleIpn(request: Request) {
 
     const wasPaid = existingRow.payment_status === "paid";
 
-    // 4. Update DB
+    // 4. Generate ticket if transitioning to paid
+    let ticketNumber: string | null = null;
+    let ticketIssuedAt: string | null = null;
+
+    if (internalStatus === "paid" && !wasPaid) {
+      // Send immediate payment received email before ticket generation
+      void sendPaymentReceivedEmail({
+        email: existingRow.email,
+        firstName: existingRow.first_name,
+        amount: existingRow.amount,
+      });
+
+      // Retry up to 3 times on unique-constraint collision
+      for (let attempt = 0; attempt < 3; attempt++) {
+        ticketNumber = generateTicketNumber();
+        const { data: existing } = await supabaseAdmin
+          .from("registrations")
+          .select("id")
+          .eq("ticket_number", ticketNumber)
+          .maybeSingle();
+        if (!existing) break;
+        if (attempt === 2) ticketNumber = null;
+      }
+      if (ticketNumber) {
+        ticketIssuedAt = new Date().toISOString();
+      }
+    }
+
+    // 5. Update DB
+    const updateData: Record<string, string | null> = { payment_status: internalStatus };
+    if (ticketNumber) {
+      updateData.ticket_number = ticketNumber;
+      updateData.ticket_issued_at = ticketIssuedAt;
+    }
+
     const { data: updatedRow, error } = await supabaseAdmin
       .from("registrations")
-      .update({ payment_status: internalStatus })
+      .update(updateData)
       .eq("order_tracking_id", orderTrackingId)
       .select()
       .maybeSingle();
@@ -72,7 +113,17 @@ export async function handleIpn(request: Request) {
     if (error) {
       console.error("IPN Supabase Error:", error);
     } else if (updatedRow && internalStatus === "paid" && !wasPaid) {
-      // 5. Send notification only on transition to paid
+      // 6. Send notification only on transition to paid
+      let ticketQrBase64: string | null = null;
+      if (updatedRow.ticket_number) {
+        try {
+          const qrBuffer = await generateTicketQrPng(updatedRow.ticket_number);
+          ticketQrBase64 = qrBuffer.toString("base64");
+        } catch (qrErr) {
+          console.error("QR generation failed (non-fatal):", qrErr);
+        }
+      }
+
       await sendRegistrationNotification({
         id: updatedRow.id,
         firstName: updatedRow.first_name,
@@ -83,6 +134,28 @@ export async function handleIpn(request: Request) {
         passType: updatedRow.pass_type,
         amount: Number(updatedRow.amount),
         paymentStatus: updatedRow.payment_status,
+        ticketNumber: updatedRow.ticket_number,
+      });
+
+      await sendRegistrantConfirmation({
+        email: updatedRow.email,
+        firstName: updatedRow.first_name,
+        referenceCode: updatedRow.reference_code,
+        passType: updatedRow.pass_type,
+        lastName: updatedRow.last_name,
+        company: updatedRow.company,
+        jobTitle: updatedRow.job_title,
+        industry: updatedRow.industry,
+        interests: updatedRow.interests,
+        networkingTargets: updatedRow.networking_targets,
+        needsHotel: updatedRow.needs_hotel,
+        needsPickup: updatedRow.needs_pickup,
+        needsVisa: updatedRow.needs_visa,
+        dietary: updatedRow.dietary,
+        accessibility: updatedRow.accessibility,
+        gender: updatedRow.gender,
+        ticketNumber: updatedRow.ticket_number,
+        ticketQrBase64,
       });
     }
 

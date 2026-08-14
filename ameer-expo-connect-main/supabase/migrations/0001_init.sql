@@ -1,4 +1,6 @@
 -- Auto-create a profile row whenever a Supabase Auth user is created
+create extension if not exists pgcrypto;
+
 create table if not exists public.profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   email text unique not null,

@@ -2,6 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Building2, Handshake, Download } from "lucide-react";
 import heroImg from "@/assets/expo-hero.jpg";
 import { Countdown } from "./Countdown";
+const HERO_LINKS = {
+  brochure: null, // TODO: replace with real URL
+};
 
 export function Hero() {
   return (
@@ -30,7 +33,7 @@ export function Hero() {
             <h1 className="mt-6 font-display text-4xl sm:text-6xl lg:text-7xl font-bold leading-[1.05]">
               Register for <span className="text-gradient-gold">Ameer Expo</span>
               <br />
-              Africa &amp; Middle East 2026
+              Africa & Middle East 2026
             </h1>
             <p className="mt-6 max-w-2xl text-base sm:text-lg text-white/85 leading-relaxed">
               Connecting Africa and the Middle East through Business, Innovation, Trade, Investment
@@ -58,12 +61,22 @@ export function Hero() {
               >
                 <Handshake size={18} /> Become a Sponsor
               </a>
-              <a
-                href="#"
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-6 py-3.5 text-sm sm:text-base font-semibold text-white/90 hover:bg-white/10 transition-colors"
-              >
-                <Download size={18} /> Brochure
-              </a>
+              {HERO_LINKS.brochure ? (
+                <a
+                  href={HERO_LINKS.brochure}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-6 py-3.5 text-sm sm:text-base font-semibold text-white/90 hover:bg-white/10 transition-colors"
+                >
+                  <Download size={18} /> Brochure
+                </a>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  title="Coming soon"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-6 py-3.5 text-sm sm:text-base font-semibold text-white/50 cursor-not-allowed"
+                >
+                  <Download size={18} /> Brochure
+                </span>
+              )}
             </div>
           </div>
 

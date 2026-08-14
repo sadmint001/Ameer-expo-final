@@ -7,15 +7,6 @@ const LANGUAGES = [
   { code: "so", label: "Somali", country: "so" },
   { code: "sw", label: "Swahili", country: "ke" },
   { code: "tr", label: "Turkish", country: "tr" },
-  { code: "fr", label: "French", country: "fr" },
-  { code: "de", label: "German", country: "de" },
-  { code: "it", label: "Italian", country: "it" },
-  { code: "es", label: "Spanish", country: "es" },
-  { code: "pt", label: "Portuguese", country: "pt" },
-  { code: "nl", label: "Dutch", country: "nl" },
-  { code: "el", label: "Greek", country: "gr" },
-  { code: "ru", label: "Russian", country: "ru" },
-  { code: "zh-CN", label: "Chinese", country: "cn" },
 ];
 
 export function LanguageSwitcher() {
@@ -23,30 +14,8 @@ export function LanguageSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load language from cookie if available and inject script
+  // Load language from cookie if available
   useEffect(() => {
-    // Inject Google Translate script safely
-    if (!document.getElementById("google-translate-script")) {
-      (window as any).googleTranslateElementInit = function () {
-        new (window as any).google.translate.TranslateElement(
-          {
-            pageLanguage: "en",
-            includedLanguages: "en,ar,so,sw,tr,fr,de,it,es,pt,nl,el,ru,zh-CN",
-            layout: (window as any).google.translate.TranslateElement.InlineLayout.SIMPLE,
-            autoDisplay: false,
-          },
-          "google_translate_element",
-        );
-      };
-
-      const script = document.createElement("script");
-      script.id = "google-translate-script";
-      script.src =
-        "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-
     const match = document.cookie.match(/(?:^|;)\s*googtrans=([^;]*)/);
     if (match) {
       const parts = match[1].split("/");
@@ -68,35 +37,32 @@ export function LanguageSwitcher() {
     if (code === "en") {
       // Reset logic
       document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=." + window.location.hostname + ";";
+      document.cookie =
+        "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=." +
+        window.location.hostname +
+        ";";
       document.documentElement.dir = "ltr";
       window.location.reload();
       return;
     }
 
-    // Set the Google Translate cookie manually for guaranteed initialization
-    document.cookie = `googtrans=/en/${code}; path=/`;
-    document.cookie = `googtrans=/en/${code}; path=/; domain=.${window.location.hostname}`;
-
-    setCurrentLang(code);
-    
-    // Keep LTR even for Arabic to preserve existing spacing/alignment
-    // Note: Full RTL support is a separate future task.
-    document.documentElement.dir = "ltr"; 
-    setIsOpen(false);
-    
-    // Reload to let the Google Translate script pick up the new cookie and apply cleanly
-    window.location.reload();
+    const select = document.querySelector("select.goog-te-combo") as HTMLSelectElement;
+    if (select) {
+      select.value = code;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      setCurrentLang(code);
+      // Keep LTR even for Arabic to preserve existing spacing/alignment
+      // Note: Full RTL support is a separate future task.
+      document.documentElement.dir = "ltr";
+      setIsOpen(false);
+    } else {
+      // If the script hasn't loaded yet, try again in a moment
+      setTimeout(() => changeLanguage(code), 500);
+    }
   };
 
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
-      {/* 
-        Note for testing: 
-        After selecting a language, navigate between routes using the app links
-        to confirm Google Translate catches the new DOM rendered by TanStack Router.
-      */}
-
       {/* Inline Strip for xl screens */}
       <div className="hidden xl:flex items-center gap-1 bg-white/5 p-1 rounded-full border border-border/40">
         {LANGUAGES.map((lang) => (
@@ -104,14 +70,14 @@ export function LanguageSwitcher() {
             key={lang.code}
             onClick={() => changeLanguage(lang.code)}
             title={lang.label}
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all overflow-hidden border border-border/20 ${
+            className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all overflow-hidden ${
               currentLang === lang.code
-                ? "shadow-glow scale-110 border-primary"
-                : "opacity-70 hover:opacity-100"
+                ? "bg-primary shadow-glow scale-110 ring-2 ring-primary ring-offset-1 ring-offset-background"
+                : "hover:bg-white/10 opacity-70 hover:opacity-100"
             }`}
           >
             <img
-              src={`https://flagcdn.com/w40/${lang.country}.png`}
+              src={`https://flagcdn.com/w20/${lang.country}.png`}
               alt={lang.label}
               className="w-full h-full object-cover"
             />
@@ -128,12 +94,14 @@ export function LanguageSwitcher() {
         >
           {currentLang === "en" ? (
             <Globe size={18} className="text-foreground" />
-          ) : (
+          ) : LANGUAGES.find((l) => l.code === currentLang) ? (
             <img
-              src={`https://flagcdn.com/w40/${LANGUAGES.find((l) => l.code === currentLang)?.country}.png`}
-              alt={currentLang}
-              className="w-6 h-6 rounded-full object-cover"
+              src={`https://flagcdn.com/w20/${LANGUAGES.find((l) => l.code === currentLang)?.country}.png`}
+              alt="Flag"
+              className="w-5 h-5 rounded-full object-cover"
             />
+          ) : (
+            <Globe size={18} />
           )}
         </button>
 
@@ -150,9 +118,9 @@ export function LanguageSwitcher() {
                 }`}
               >
                 <img
-                  src={`https://flagcdn.com/w40/${lang.country}.png`}
+                  src={`https://flagcdn.com/w20/${lang.country}.png`}
                   alt={lang.label}
-                  className="w-5 h-5 rounded-full object-cover border border-border/20"
+                  className="w-5 h-auto rounded-[2px]"
                 />
                 <span className="flex-1">{lang.label}</span>
                 {currentLang === lang.code && <Check size={16} />}

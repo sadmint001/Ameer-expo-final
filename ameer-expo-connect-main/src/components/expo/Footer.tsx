@@ -1,12 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import { Mail, Phone, MapPin, Instagram, Linkedin, Twitter, Facebook } from "lucide-react";
-import logo from "@/assets/ameer-expo-logo.png.asset.json";
+import logo from "@/assets/ameer-expo-logo.png";
 
 const SOCIAL_LINKS = {
-  linkedin: "#", // TODO: replace with real URL
-  twitter: "#", // TODO: replace with real URL
-  instagram: "#", // TODO: replace with real URL
-  facebook: "#", // TODO: replace with real URL
+  linkedin: null, // TODO: replace with real URL
+  twitter: null, // TODO: replace with real URL
+  instagram: null, // TODO: replace with real URL
+  facebook: null, // TODO: replace with real URL
+};
+
+const FOOTER_LINKS = {
+  privacy: null, // TODO: replace with real URL
+  terms: "/terms",
+  cookies: null, // TODO: replace with real URL
+  brochure: null, // TODO: replace with real URL
 };
 
 export function Footer() {
@@ -31,13 +38,7 @@ export function Footer() {
         <div className="grid gap-10 lg:grid-cols-4">
           <div>
             <div className="flex items-center gap-3">
-              <img
-                src={logo.url}
-                alt=""
-                className="h-12 w-12 object-contain"
-                width={48}
-                height={48}
-              />
+              <img src={logo} alt="" className="h-12 w-12 object-contain" width={48} height={48} />
               <div>
                 <div className="font-display font-bold">Ameer Expo</div>
                 <div className="text-xs uppercase tracking-[0.18em] text-white/70">
@@ -55,15 +56,26 @@ export function Footer() {
                 { icon: Twitter, url: SOCIAL_LINKS.twitter },
                 { icon: Instagram, url: SOCIAL_LINKS.instagram },
                 { icon: Facebook, url: SOCIAL_LINKS.facebook },
-              ].map(({ icon: I, url }, i) => (
-                <a
-                  key={i}
-                  href={url}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 hover:bg-gold hover:text-gold-foreground transition-colors"
-                >
-                  <I size={16} />
-                </a>
-              ))}
+              ].map(({ icon: I, url }, i) =>
+                url ? (
+                  <a
+                    key={i}
+                    href={url}
+                    className="grid h-9 w-9 place-items-center rounded-full bg-white/10 hover:bg-gold hover:text-gold-foreground transition-colors"
+                  >
+                    <I size={16} />
+                  </a>
+                ) : (
+                  <span
+                    key={i}
+                    aria-disabled="true"
+                    title="Coming soon"
+                    className="grid h-9 w-9 place-items-center rounded-full bg-white/10 opacity-50 cursor-not-allowed"
+                  >
+                    <I size={16} />
+                  </span>
+                ),
+              )}
             </div>
           </div>
 
@@ -112,9 +124,19 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-gold">
-                  Download Brochure
-                </a>
+                {FOOTER_LINKS.brochure ? (
+                  <a href={FOOTER_LINKS.brochure} className="hover:text-gold">
+                    Download Brochure
+                  </a>
+                ) : (
+                  <span
+                    className="opacity-50 cursor-not-allowed"
+                    aria-disabled="true"
+                    title="Coming soon"
+                  >
+                    Download Brochure
+                  </span>
+                )}
               </li>
             </ul>
           </div>
@@ -139,15 +161,35 @@ export function Footer() {
         <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/60">
           <div>© 2026 Ameer Group Ltd. All rights reserved.</div>
           <div className="flex gap-4">
-            <a href="#" className="hover:text-gold">
-              Privacy
-            </a>
-            <a href="#" className="hover:text-gold">
+            {FOOTER_LINKS.privacy ? (
+              <a href={FOOTER_LINKS.privacy} className="hover:text-gold">
+                Privacy
+              </a>
+            ) : (
+              <span
+                className="opacity-50 cursor-not-allowed"
+                aria-disabled="true"
+                title="Coming soon"
+              >
+                Privacy
+              </span>
+            )}
+            <a href={FOOTER_LINKS.terms} className="hover:text-gold">
               Terms
             </a>
-            <a href="#" className="hover:text-gold">
-              Cookies
-            </a>
+            {FOOTER_LINKS.cookies ? (
+              <a href={FOOTER_LINKS.cookies} className="hover:text-gold">
+                Cookies
+              </a>
+            ) : (
+              <span
+                className="opacity-50 cursor-not-allowed"
+                aria-disabled="true"
+                title="Coming soon"
+              >
+                Cookies
+              </span>
+            )}
           </div>
         </div>
       </div>

@@ -10,11 +10,51 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AdminLoginRouteImport } from './routes/admin-login'
+import { Route as AdminSetupRouteImport } from './routes/admin-setup'
+import { Route as AttendeesRouteImport } from './routes/attendees'
+import { Route as ExhibitRouteImport } from './routes/exhibit'
+import { Route as FloorPlanRouteImport } from './routes/floor-plan'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as ScheduleRouteImport } from './routes/schedule'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as VerifyTicketNumberRouteImport } from './routes/verify.$ticketNumber'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin-login',
+  path: '/admin-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSetupRoute = AdminSetupRouteImport.update({
+  id: '/admin-setup',
+  path: '/admin-setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AttendeesRoute = AttendeesRouteImport.update({
+  id: '/attendees',
+  path: '/attendees',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExhibitRoute = ExhibitRouteImport.update({
+  id: '/exhibit',
+  path: '/exhibit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FloorPlanRoute = FloorPlanRouteImport.update({
+  id: '/floor-plan',
+  path: '/floor-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -22,31 +62,128 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScheduleRoute = ScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyTicketNumberRoute = VerifyTicketNumberRouteImport.update({
+  id: '/verify/$ticketNumber',
+  path: '/verify/$ticketNumber',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/admin-login': typeof AdminLoginRoute
+  '/admin-setup': typeof AdminSetupRoute
+  '/attendees': typeof AttendeesRoute
+  '/exhibit': typeof ExhibitRoute
+  '/floor-plan': typeof FloorPlanRoute
   '/register': typeof RegisterRoute
+  '/resources': typeof ResourcesRoute
+  '/schedule': typeof ScheduleRoute
+  '/terms': typeof TermsRoute
+  '/verify/$ticketNumber': typeof VerifyTicketNumberRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/admin-login': typeof AdminLoginRoute
+  '/admin-setup': typeof AdminSetupRoute
+  '/attendees': typeof AttendeesRoute
+  '/exhibit': typeof ExhibitRoute
+  '/floor-plan': typeof FloorPlanRoute
   '/register': typeof RegisterRoute
+  '/resources': typeof ResourcesRoute
+  '/schedule': typeof ScheduleRoute
+  '/terms': typeof TermsRoute
+  '/verify/$ticketNumber': typeof VerifyTicketNumberRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/admin-login': typeof AdminLoginRoute
+  '/admin-setup': typeof AdminSetupRoute
+  '/attendees': typeof AttendeesRoute
+  '/exhibit': typeof ExhibitRoute
+  '/floor-plan': typeof FloorPlanRoute
   '/register': typeof RegisterRoute
+  '/resources': typeof ResourcesRoute
+  '/schedule': typeof ScheduleRoute
+  '/terms': typeof TermsRoute
+  '/verify/$ticketNumber': typeof VerifyTicketNumberRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/register'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/admin-login'
+    | '/admin-setup'
+    | '/attendees'
+    | '/exhibit'
+    | '/floor-plan'
+    | '/register'
+    | '/resources'
+    | '/schedule'
+    | '/terms'
+    | '/verify/$ticketNumber'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/register'
-  id: '__root__' | '/' | '/register'
+  to:
+    | '/'
+    | '/admin'
+    | '/admin-login'
+    | '/admin-setup'
+    | '/attendees'
+    | '/exhibit'
+    | '/floor-plan'
+    | '/register'
+    | '/resources'
+    | '/schedule'
+    | '/terms'
+    | '/verify/$ticketNumber'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/admin-login'
+    | '/admin-setup'
+    | '/attendees'
+    | '/exhibit'
+    | '/floor-plan'
+    | '/register'
+    | '/resources'
+    | '/schedule'
+    | '/terms'
+    | '/verify/$ticketNumber'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  AdminLoginRoute: typeof AdminLoginRoute
+  AdminSetupRoute: typeof AdminSetupRoute
+  AttendeesRoute: typeof AttendeesRoute
+  ExhibitRoute: typeof ExhibitRoute
+  FloorPlanRoute: typeof FloorPlanRoute
   RegisterRoute: typeof RegisterRoute
+  ResourcesRoute: typeof ResourcesRoute
+  ScheduleRoute: typeof ScheduleRoute
+  TermsRoute: typeof TermsRoute
+  VerifyTicketNumberRoute: typeof VerifyTicketNumberRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +195,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-login': {
+      id: '/admin-login'
+      path: '/admin-login'
+      fullPath: '/admin-login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-setup': {
+      id: '/admin-setup'
+      path: '/admin-setup'
+      fullPath: '/admin-setup'
+      preLoaderRoute: typeof AdminSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/attendees': {
+      id: '/attendees'
+      path: '/attendees'
+      fullPath: '/attendees'
+      preLoaderRoute: typeof AttendeesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/exhibit': {
+      id: '/exhibit'
+      path: '/exhibit'
+      fullPath: '/exhibit'
+      preLoaderRoute: typeof ExhibitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/floor-plan': {
+      id: '/floor-plan'
+      path: '/floor-plan'
+      fullPath: '/floor-plan'
+      preLoaderRoute: typeof FloorPlanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -65,12 +244,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/schedule': {
+      id: '/schedule'
+      path: '/schedule'
+      fullPath: '/schedule'
+      preLoaderRoute: typeof ScheduleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify/$ticketNumber': {
+      id: '/verify/$ticketNumber'
+      path: '/verify/$ticketNumber'
+      fullPath: '/verify/$ticketNumber'
+      preLoaderRoute: typeof VerifyTicketNumberRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  AdminLoginRoute: AdminLoginRoute,
+  AdminSetupRoute: AdminSetupRoute,
+  AttendeesRoute: AttendeesRoute,
+  ExhibitRoute: ExhibitRoute,
+  FloorPlanRoute: FloorPlanRoute,
   RegisterRoute: RegisterRoute,
+  ResourcesRoute: ResourcesRoute,
+  ScheduleRoute: ScheduleRoute,
+  TermsRoute: TermsRoute,
+  VerifyTicketNumberRoute: VerifyTicketNumberRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

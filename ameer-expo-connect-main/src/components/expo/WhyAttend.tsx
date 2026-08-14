@@ -1,10 +1,14 @@
+import { useState } from "react";
 import {
-  Network,
+  Globe2,
   TrendingUp,
-  Briefcase,
-  Landmark,
-  Cpu,
+  Handshake,
+  Award,
   Lightbulb,
+  Network,
+  Landmark,
+  Briefcase,
+  Cpu,
   Factory,
   ShoppingBag,
   Building,
@@ -14,9 +18,41 @@ import {
   GraduationCap,
   Zap,
   HardHat,
+  CircleCheck,
+  type LucideIcon,
 } from "lucide-react";
 
-const items = [
+type Card = { icon: LucideIcon; title: string; desc: string };
+
+const exhibitorBenefits: Card[] = [
+  {
+    icon: Globe2,
+    title: "Access New Markets",
+    desc: "Connect with buyers, distributors and investors from across Africa and the Middle East.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Grow Your Business",
+    desc: "Generate quality leads, close deals and expand your customer base.",
+  },
+  {
+    icon: Handshake,
+    title: "Build Partnerships",
+    desc: "Collaborate with industry leaders and key decision makers.",
+  },
+  {
+    icon: Award,
+    title: "Enhance Brand Visibility",
+    desc: "Showcase your brand to a diverse and targeted international audience.",
+  },
+  {
+    icon: Lightbulb,
+    title: "Gain Insights",
+    desc: "Stay ahead with industry trends, innovations and expert knowledge.",
+  },
+];
+
+const whatToExpect: Card[] = [
   { icon: Network, title: "Networking", desc: "Meet 15,000+ decision-makers." },
   { icon: TrendingUp, title: "Investment", desc: "Access qualified capital." },
   { icon: Briefcase, title: "Business Matching", desc: "Curated 1:1 meetings." },
@@ -34,27 +70,87 @@ const items = [
   { icon: HardHat, title: "Construction", desc: "Infrastructure at scale." },
 ];
 
+const whoYouMeet: Card[] = [
+  {
+    icon: CircleCheck,
+    title: "Investors & Financiers",
+    desc: "Venture capitalists, private equity, and institutional funders.",
+  },
+  {
+    icon: CircleCheck,
+    title: "Business Leaders",
+    desc: "CEOs, directors, and executives from leading regional enterprises.",
+  },
+  {
+    icon: CircleCheck,
+    title: "Government Representatives",
+    desc: "Ministers, ambassadors, and policy makers facilitating trade.",
+  },
+  {
+    icon: CircleCheck,
+    title: "Industry Experts",
+    desc: "Analysts, researchers, and specialists in real estate, ICT, and energy.",
+  },
+  {
+    icon: CircleCheck,
+    title: "Entrepreneurs & Startups",
+    desc: "Founders introducing disruptive innovations to the ecosystem.",
+  },
+  {
+    icon: CircleCheck,
+    title: "Buyers & Distributors",
+    desc: "Sourcing agents, wholesalers, and retail network partners.",
+  },
+];
+
+const TABS = [
+  { key: "benefits", label: "Exhibitor Benefits", items: exhibitorBenefits },
+  { key: "expect", label: "What to Expect", items: whatToExpect },
+  { key: "meet", label: "Who Will You Meet", items: whoYouMeet },
+] as const;
+
 export function WhyAttend() {
+  const [active, setActive] = useState<(typeof TABS)[number]["key"]>("benefits");
+  const activeTab = TABS.find((t) => t.key === active) ?? TABS[0];
+
   return (
     <section id="why" className="relative py-24 sm:py-32 bg-secondary/40">
       <div className="mx-auto max-w-7xl px-4">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="max-w-2xl">
-            <div className="text-xs uppercase tracking-[0.24em] text-primary font-semibold">
-              Why Attend
-            </div>
-            <h2 className="mt-3 font-display text-3xl sm:text-5xl font-bold text-foreground">
-              Fifteen reasons to be <span className="text-gradient-gold">on the floor</span>.
-            </h2>
+        <div className="max-w-3xl">
+          <div className="text-xs uppercase tracking-[0.24em] text-primary font-semibold">
+            Why Ameer Expo
           </div>
-          <p className="max-w-md text-muted-foreground">
-            Every sector, every deal-maker, every currency of the region — under one roof for 72
-            hours.
+          <h2 className="mt-3 font-display text-3xl sm:text-5xl font-bold text-foreground">
+            Uniting opportunities.{" "}
+            <span className="text-gradient-gold">Building partnerships.</span>
+          </h2>
+          <p className="mt-5 text-base sm:text-lg text-muted-foreground leading-relaxed">
+            Ameer Expo is your gateway to emerging markets, strategic partnerships, and
+            transformative opportunities across Africa and the Middle East.
           </p>
         </div>
 
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((it) => (
+        <div className="mt-10 flex justify-center">
+          <div className="inline-flex flex-wrap justify-center gap-1 rounded-full bg-card p-1.5 border border-border/60 shadow-soft">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setActive(t.key)}
+                className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${
+                  active === t.key
+                    ? "bg-gradient-gold text-gold-foreground shadow-elegant"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {activeTab.items.map((it) => (
             <div
               key={it.title}
               className="group relative overflow-hidden rounded-2xl bg-card p-6 border border-border/60 shadow-soft hover:shadow-elegant hover:-translate-y-1 transition-all duration-300"

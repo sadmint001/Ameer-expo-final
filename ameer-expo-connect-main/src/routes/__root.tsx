@@ -10,6 +10,9 @@ import {
 import { useEffect, type ReactNode } from "react";
 import "../lib/google-translate-patch";
 
+import { Toaster } from "@/components/ui/sonner";
+import { GlobalAnnouncements } from "@/components/expo/GlobalAnnouncements";
+import { WhatsAppButton } from "@/components/expo/WhatsAppButton";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -92,7 +95,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon-64.png?v=2", type: "image/png", sizes: "64x64" },
+      { rel: "shortcut icon", href: "/favicon-64.png?v=2" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -109,17 +113,56 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body>
-        <div id="google_translate_element" className="hidden"></div>
+      <body suppressHydrationWarning>
+        <GoogleTranslateLoader />
+        <div id="google_translate_element" className="hidden" suppressHydrationWarning></div>
         {children}
         <Scripts />
       </body>
     </html>
   );
+}
+
+function GoogleTranslateLoader() {
+  useEffect(() => {
+    const googleWindow = window as Window & {
+      google?: {
+        translate?: {
+          TranslateElement?: new (
+            options: { pageLanguage: string; autoDisplay: boolean },
+            elementId: string,
+          ) => unknown;
+        };
+      };
+      googleTranslateElementInit?: () => void;
+    };
+
+    const existingScript = document.getElementById("google-translate-script");
+    if (existingScript) return;
+
+    googleWindow.googleTranslateElementInit = function () {
+      if (!googleWindow.google?.translate?.TranslateElement) return;
+
+      new googleWindow.google.translate.TranslateElement(
+        { pageLanguage: "en", autoDisplay: false },
+        "google_translate_element",
+      );
+    };
+
+    const script = document.createElement("script");
+    script.id = "google-translate-script";
+    script.src =
+      "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, []);
+
+  return null;
 }
 
 function RootComponent() {
@@ -129,6 +172,9 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <GlobalAnnouncements />
+      <Toaster position="top-right" />
+      <WhatsAppButton />
     </QueryClientProvider>
   );
 }

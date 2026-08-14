@@ -1,24 +1,26 @@
-// Protect React DOM from Google Translate wrapping text nodes
-if (
-  typeof window !== "undefined" &&
-  typeof Node !== "undefined" &&
-  typeof Node.prototype.removeChild === "function"
-) {
+// This patch prevents Google Translate from crashing the React app when it modifies DOM nodes
+// that React is trying to manage. It intercepts removeChild and insertBefore calls.
+
+if (typeof Node === "function" && Node.prototype) {
   const originalRemoveChild = Node.prototype.removeChild;
-  Node.prototype.removeChild = function <T extends Node>(child: T): T {
+  Node.prototype.removeChild = function (child: Node) {
     if (child.parentNode !== this) {
-      // Google Translate already moved/removed this node — ignore instead
-      // of letting React crash the tree.
+      if (console)
+        console.warn("Google Translate removed a child node that was not a child of this node.");
       return child;
     }
-    return originalRemoveChild.call(this, child) as T;
+    return originalRemoveChild.call(this, child);
   };
 
   const originalInsertBefore = Node.prototype.insertBefore;
-  Node.prototype.insertBefore = function <T extends Node>(node: T, child: Node | null): T {
-    if (child && child.parentNode !== this) {
-      return node;
+  Node.prototype.insertBefore = function (newNode: Node, referenceNode: Node | null) {
+    if (referenceNode && referenceNode.parentNode !== this) {
+      if (console)
+        console.warn(
+          "Google Translate inserted a node before a node that was not a child of this node.",
+        );
+      return newNode;
     }
-    return originalInsertBefore.call(this, node, child) as T;
+    return originalInsertBefore.call(this, newNode, referenceNode);
   };
 }

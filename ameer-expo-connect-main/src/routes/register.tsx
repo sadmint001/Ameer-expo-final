@@ -1,22 +1,35 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { submitRegistration, getRegistrationStatus } from "../server/registration";
+import {
+  submitRegistration,
+  getRegistrationStatus,
+  resumeRegistrationPayment,
+} from "../server/registration";
+import { downloadTicketPdf, downloadTicketIcs } from "../server/ticket";
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   User,
   Briefcase,
-  Sparkles,
-  Users,
-  Hotel,
+  MapPin,
+  Ticket,
   ClipboardCheck,
   PartyPopper,
-  Star,
+  Download,
+  Calendar,
+  Loader2,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Crown,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
-import logo from "@/assets/ameer-expo-logo.png.asset.json";
+import logo from "@/assets/ameer-expo-logo.png";
 import { VideoEmbed } from "../components/expo/VideoEmbed";
-
+import { LanguageSwitcher } from "../components/expo/LanguageSwitcher";
+import { RegistrationTypeGate } from "../components/expo/RegistrationTypeGate";
 export const Route = createFileRoute("/register")({
   component: Register,
   head: () => ({
@@ -25,7 +38,7 @@ export const Route = createFileRoute("/register")({
       {
         name: "description",
         content:
-          "Complete your Ameer Expo 2026 visitor registration in 6 quick steps. Get your QR badge and confirmation instantly.",
+          "Complete your Ameer Expo 2026 visitor registration in 5 quick steps. Get your QR badge and confirmation instantly.",
       },
       { property: "og:title", content: "Register · Ameer Expo 2026" },
       {
@@ -39,10 +52,8 @@ export const Route = createFileRoute("/register")({
 const steps = [
   { key: "personal", label: "Personal", icon: User },
   { key: "professional", label: "Professional", icon: Briefcase },
-  { key: "interests", label: "Interests", icon: Sparkles },
-  { key: "networking", label: "Networking", icon: Users },
-  { key: "logistics", label: "Logistics", icon: Hotel },
-  { key: "passType", label: "Pass Type", icon: Star },
+  { key: "logistics", label: "Logistics", icon: MapPin },
+  { key: "passType", label: "Pass Type", icon: Ticket },
   { key: "review", label: "Review", icon: ClipboardCheck },
 ];
 
@@ -81,22 +92,10 @@ const businessTypes = [
   "Other",
 ];
 
-const networkingTargets = [
-  "Investors",
-  "Suppliers",
-  "Manufacturers",
-  "Government",
-  "Technology Partners",
-  "Importers",
-  "Exporters",
-  "Distributors",
-];
-
 type FormState = {
   firstName: string;
   lastName: string;
   gender: string;
-  dob: string;
   idNumber: string;
   country: string;
   city: string;
@@ -110,9 +109,6 @@ type FormState = {
   website: string;
   businessType: string;
   experience: string;
-  interests: string[];
-  b2b: string;
-  targets: string[];
   hotel: boolean;
   pickup: boolean;
   visa: boolean;
@@ -126,7 +122,6 @@ const initial: FormState = {
   firstName: "",
   lastName: "",
   gender: "",
-  dob: "",
   idNumber: "",
   country: "",
   city: "",
@@ -140,9 +135,6 @@ const initial: FormState = {
   website: "",
   businessType: "",
   experience: "",
-  interests: [],
-  b2b: "",
-  targets: [],
   hotel: false,
   pickup: false,
   visa: false,
@@ -156,10 +148,12 @@ function Field({
   label,
   children,
   required,
+  error,
 }: {
   label: string;
   children: React.ReactNode;
   required?: boolean;
+  error?: string;
 }) {
   return (
     <label className="block">
@@ -168,6 +162,12 @@ function Field({
         {required && <span className="text-destructive">*</span>}
       </span>
       <div className="mt-2">{children}</div>
+      {error ? (
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-destructive">
+          <AlertCircle size={14} className="shrink-0" />
+          {error}
+        </p>
+      ) : null}
     </label>
   );
 }
@@ -201,18 +201,114 @@ function Chip({
 
 const STORAGE_KEY = "ameer-expo-register-v1";
 
+function getPersonalStepErrors(form: FormState) {
+  const errors: Partial<Record<"country" | "city", string>> = {};
+
+  if (!form.country.trim()) {
+    errors.country = "Country is required";
+  }
+
+  if (!form.city.trim()) {
+    errors.city = "City is required";
+  }
+
+  return errors;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Step Progress Indicator
+// ──────────────────────────────────────────────────────────────────────────────
+function StepIndicator({ currentStep }: { currentStep: number }) {
+  return (
+    <>
+      {/* Desktop: full horizontal row */}
+      <div className="hidden md:flex items-center">
+        {steps.map((s, i) => {
+          const done = i < currentStep;
+          const active = i === currentStep;
+          const StepIcon = s.icon;
+          return (
+            <div key={s.key} className="flex items-center">
+              <div className="flex flex-col items-center gap-1.5">
+                <div
+                  className={`grid h-10 w-10 place-items-center rounded-full transition-all duration-300 ${
+                    done
+                      ? "bg-gradient-gold text-gold-foreground shadow-glow"
+                      : active
+                        ? "border-2 border-primary text-primary bg-card shadow-soft"
+                        : "border-2 border-border/60 text-muted-foreground bg-card"
+                  }`}
+                >
+                  {done ? <Check size={16} strokeWidth={2.5} /> : <StepIcon size={16} />}
+                </div>
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                    active ? "text-foreground" : done ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {i < steps.length - 1 && (
+                <div className="mx-2 mb-4 h-px flex-1 min-w-[20px] overflow-hidden rounded-full bg-border/60">
+                  <div
+                    className="h-full rounded-full bg-gradient-gold transition-all duration-500"
+                    style={{ width: i < currentStep ? "100%" : "0%" }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mobile: compact "Step X of Y — Label" + progress bar */}
+      <div className="md:hidden">
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="font-semibold text-foreground">
+            Step {currentStep + 1} of {steps.length}
+          </span>
+          <span className="text-muted-foreground">{steps[currentStep].label}</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full rounded-full bg-gradient-gold transition-all duration-500"
+            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Main component
+// ──────────────────────────────────────────────────────────────────────────────
 function Register() {
+  const navigate = useNavigate();
+  const t = (str: string) => str;
+  const [typeGateDone, setTypeGateDone] = useState(false);
   const [step, setStep] = useState(0);
   const [f, setF] = useState<FormState>(initial);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [resumedAt, setResumedAt] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
   const [confirmingRid, setConfirmingRid] = useState<string | null>(null);
+  const [pendingRid, setPendingRid] = useState<string | null>(null);
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [pollTimeout, setPollTimeout] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [personalTouchedFields, setPersonalTouchedFields] = useState<Record<string, boolean>>({});
+  const [personalValidationAttempted, setPersonalValidationAttempted] = useState(false);
+  const [resumeId, setResumeId] = useState<string | null>(null);
+  const [isResuming, setIsResuming] = useState(false);
+  const [paymentFailed, setPaymentFailed] = useState(false);
 
   // Check for rid in URL on mount
   useEffect(() => {
@@ -220,6 +316,7 @@ function Register() {
     const rid = searchParams.get("rid");
     if (rid) {
       setConfirmingRid(rid);
+      setPendingRid(rid);
       // Remove rid from URL to prevent polling again on refresh
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -239,11 +336,17 @@ function Register() {
         if (!isSubscribed) return;
 
         if (result && result.paymentStatus === "paid") {
-          setSubmitted(confirmingRid);
+          setSubmitted(result.ticketNumber || result.referenceCode);
+          setSubmittedId(confirmingRid);
+          setPaymentStatus("paid");
           try {
             localStorage.setItem(
               STORAGE_KEY,
-              JSON.stringify({ submitted: confirmingRid, savedAt: new Date().toISOString() }),
+              JSON.stringify({
+                submitted: result.ticketNumber || result.referenceCode,
+                paymentStatus: "paid",
+                savedAt: new Date().toISOString(),
+              }),
             );
           } catch {
             /* ignore */
@@ -289,9 +392,13 @@ function Register() {
           step?: number;
           savedAt?: string;
           submitted?: string | null;
+          paymentStatus?: string | null;
         };
         if (parsed.submitted) {
           setSubmitted(parsed.submitted);
+          if (parsed.paymentStatus) setPaymentStatus(parsed.paymentStatus);
+          // Note: we can't restore submittedId from localStorage right now,
+          // so download buttons won't appear on a hard refresh after success.
         } else {
           if (parsed.form) setF({ ...initial, ...parsed.form });
           if (typeof parsed.step === "number") {
@@ -325,11 +432,6 @@ function Register() {
   }, [f, step, hydrated, submitted]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));
-  const toggle = (k: "interests" | "targets", v: string) =>
-    setF((s) => ({
-      ...s,
-      [k]: s[k].includes(v) ? s[k].filter((x) => x !== v) : [...s[k], v],
-    }));
 
   const clearDraft = () => {
     try {
@@ -343,12 +445,20 @@ function Register() {
     setSavedAt(null);
   };
 
-  const progress = useMemo(() => ((step + 1) / steps.length) * 100, [step]);
+  const personalErrors = useMemo(() => (step === 0 ? getPersonalStepErrors(f) : {}), [f, step]);
+
+  const showPersonalError = (field: "country" | "city") => {
+    return (
+      step === 0 &&
+      (personalValidationAttempted || personalTouchedFields[field]) &&
+      !!personalErrors[field]
+    );
+  };
 
   const canNext = () => {
-    if (step === 0) return f.firstName && f.lastName && f.email && f.country && f.phone;
+    if (step === 0) return Object.keys(personalErrors).length === 0;
     if (step === 1) return f.company && f.jobTitle && f.businessType;
-    if (step === 6) return f.terms;
+    if (step === 4) return f.terms;
     return true;
   };
 
@@ -356,43 +466,156 @@ function Register() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
+      if (pendingRid) {
+        // Resume polling the existing registration instead of creating a duplicate
+        setConfirmingRid(pendingRid);
+        return;
+      }
+
       const result = await submitRegistration({ data: f });
-      if (result.success) {
-        if (result.redirectUrl) {
-          window.location.href = result.redirectUrl;
-          return;
-        }
-        try {
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({ submitted: result.id, savedAt: new Date().toISOString() }),
-          );
-        } catch {
-          /* ignore */
-        }
-        setSubmitted(result.id);
+
+      if (result.pendingRegistration) {
+        setResumeId(result.id);
+        return;
+      }
+
+      if (!result.success) {
+        setSubmitError(result.error || "Registration failed. Please try again.");
+        return;
+      }
+
+      if (result.redirectUrl) {
+        setIsRedirecting(true);
+        setPendingRid(result.id);
+        setTimeout(() => {
+          window.location.href = result.redirectUrl!;
+        }, 800);
+        return;
+      }
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            submitted: result.ticketNumber || result.referenceCode,
+            paymentStatus: result.paymentStatus,
+            savedAt: new Date().toISOString(),
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
+      setSubmitted(result.ticketNumber || result.referenceCode);
+      setPaymentStatus(result.paymentStatus as string);
+      setSubmittedId(result.id);
+      if (result.paymentFailed) {
+        setPaymentFailed(true);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed. Please try again.";
-      setSubmitError(msg);
+      console.error("Registration error:", err);
+      if (msg.trim().startsWith("<")) {
+        setSubmitError(
+          "Something went wrong saving your registration. Please try again in a moment.",
+        );
+      } else {
+        setSubmitError(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // ── Redirect loading overlay ────────────────────────────────────────────────
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-secondary/40">
+        <TopBar />
+        <div className="mx-auto max-w-2xl px-4 py-24">
+          <div className="rounded-2xl md:rounded-3xl bg-card p-10 text-center shadow-elegant border border-border/60">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Loader2 size={32} className="animate-spin" />
+            </div>
+            <h2 className="mb-2 font-display text-2xl font-bold">Redirecting to Payment</h2>
+            <p className="text-sm text-muted-foreground">
+              You're being sent to Pesapal to complete your VIP pass purchase.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Resume Payment Screen ───────────────────────────────────────────────────
+  if (resumeId) {
+    return (
+      <div className="min-h-screen bg-secondary/40">
+        <TopBar />
+        <div className="mx-auto max-w-2xl px-4 py-24">
+          <div className="rounded-2xl md:rounded-3xl bg-card p-10 text-center shadow-elegant border border-border/60">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Ticket size={32} />
+            </div>
+            <h2 className="mb-2 font-display text-2xl font-bold">Resume Payment?</h2>
+            <p className="mb-8 text-sm text-muted-foreground">
+              We found a pending VIP pass registration for this email. Would you like to resume your
+              payment?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => {
+                  setIsResuming(true);
+                  setSubmitError(null);
+                  try {
+                    const res = await resumeRegistrationPayment({ data: resumeId });
+                    if (res.success && res.redirectUrl) {
+                      setIsRedirecting(true);
+                      setPendingRid(res.id);
+                      setTimeout(() => {
+                        window.location.href = res.redirectUrl!;
+                      }, 800);
+                    } else {
+                      setSubmitError(res.error || "Failed to resume payment.");
+                      setResumeId(null);
+                    }
+                  } catch {
+                    setSubmitError("Failed to resume payment.");
+                    setResumeId(null);
+                  } finally {
+                    setIsResuming(false);
+                  }
+                }}
+                disabled={isResuming}
+                className="rounded-xl bg-gradient-primary px-8 py-4 font-semibold text-primary-foreground shadow-glow hover:-translate-y-1 transition-all disabled:opacity-50"
+              >
+                {isResuming ? <Loader2 className="animate-spin inline mr-2" size={18} /> : null}
+                Yes, resume payment
+              </button>
+              <button
+                onClick={() => setResumeId(null)}
+                className="rounded-xl border border-border bg-card px-8 py-4 font-medium hover:bg-secondary/50 transition-colors"
+              >
+                No, go back
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Payment polling screen ──────────────────────────────────────────────────
   if (confirmingRid) {
     return (
       <div className="min-h-screen bg-secondary/40">
         <TopBar />
         <div className="mx-auto max-w-2xl px-4 py-24">
-          <div className="rounded-3xl bg-card p-10 text-center shadow-elegant border border-border/60">
-            <div className="mx-auto mb-6 flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-gold/20 text-gold">
-              <Star size={32} />
+          <div className="rounded-2xl md:rounded-3xl bg-card p-10 text-center shadow-elegant border border-border/60">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Loader2 size={32} className="animate-spin" />
             </div>
-            <h2 className="mb-4 font-display text-3xl font-bold">Confirming Payment...</h2>
-            <p className="mb-8 text-muted-foreground">
-              Please wait while we verify your payment with Pesapal. This usually takes a few
-              seconds.
+            <h2 className="mb-2 font-display text-2xl font-bold">Confirming your payment</h2>
+            <p className="text-sm text-muted-foreground">
+              This usually takes a few seconds. Please don't close this page.
             </p>
           </div>
         </div>
@@ -400,19 +623,36 @@ function Register() {
     );
   }
 
+  // ── Poll timeout screen ─────────────────────────────────────────────────────
   if (pollTimeout) {
     return (
       <div className="min-h-screen bg-secondary/40">
         <TopBar />
         <div className="mx-auto max-w-2xl px-4 py-24">
-          <div className="rounded-3xl bg-card p-10 text-center shadow-elegant border border-border/60">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 text-primary">
-              <Check size={32} />
+          <div className="rounded-2xl md:rounded-3xl bg-card p-10 text-center shadow-elegant border border-border/60">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <AlertTriangle size={32} />
             </div>
-            <h2 className="mb-4 font-display text-3xl font-bold">Payment Processing</h2>
-            <p className="mb-8 text-muted-foreground">
-              Your payment is taking longer than usual to confirm. Don't worry — we'll email your
-              confirmation and VIP pass once it goes through.
+            <h2 className="mb-2 font-display text-2xl font-bold">Payment Processing</h2>
+            <p className="mb-8 text-sm text-muted-foreground leading-relaxed">
+              Still processing? This can take a few minutes for M-Pesa. You can also{" "}
+              <button
+                onClick={() => {
+                  setPollTimeout(false);
+                  setConfirmingRid(pendingRid);
+                }}
+                className="font-medium text-primary hover:underline"
+              >
+                check status manually
+              </button>{" "}
+              or{" "}
+              <a
+                href="mailto:info@ameergroupltd.com"
+                className="font-medium text-primary hover:underline"
+              >
+                contact us
+              </a>
+              .
             </p>
           </div>
         </div>
@@ -420,20 +660,24 @@ function Register() {
     );
   }
 
+  // ── Payment failed screen ───────────────────────────────────────────────────
   if (pollError) {
     return (
       <div className="min-h-screen bg-secondary/40">
         <TopBar />
         <div className="mx-auto max-w-2xl px-4 py-24">
-          <div className="rounded-3xl bg-card p-10 text-center shadow-elegant border border-destructive/60">
-            <h2 className="mb-4 font-display text-3xl font-bold text-destructive">
+          <div className="rounded-2xl md:rounded-3xl bg-card p-10 text-center shadow-elegant border border-destructive/60">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertCircle size={32} />
+            </div>
+            <h2 className="mb-2 font-display text-2xl font-bold text-destructive">
               Payment Failed
             </h2>
-            <p className="mb-8 text-muted-foreground">{pollError}</p>
+            <p className="mb-8 text-sm text-muted-foreground">{pollError}</p>
             <button
               onClick={() => {
                 setPollError(null);
-                setStep(5); // Go back to pass type
+                submit();
               }}
               className="rounded-xl bg-gradient-primary px-8 py-4 font-semibold text-primary-foreground shadow-glow hover:-translate-y-1 transition-all"
             >
@@ -445,47 +689,198 @@ function Register() {
     );
   }
 
+  // ── Success / Boarding-pass screen ──────────────────────────────────────────
   if (submitted) {
     return (
       <div className="min-h-screen bg-secondary/40">
         <TopBar />
-        <div className="mx-auto max-w-2xl px-4 py-24">
-          <div className="rounded-3xl bg-card p-10 text-center shadow-elegant border border-border/60">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-gold text-gold-foreground shadow-glow">
-              <PartyPopper size={30} />
-            </div>
-            <h1 className="mt-6 font-display text-3xl font-bold">You're in.</h1>
-            <p className="mt-2 text-muted-foreground">
-              A confirmation email and QR badge are on the way.
-            </p>
-            <div className="mt-8 rounded-2xl bg-secondary/60 p-5">
-              <div className="text-xs uppercase tracking-widest text-muted-foreground">
-                Registration Number
+        <div className="mx-auto max-w-lg px-4 py-16">
+          {/* Ticket stub card */}
+          <div className="rounded-2xl md:rounded-3xl bg-card shadow-elegant border border-border/60 overflow-hidden">
+            {/* Header strip */}
+            <div className="bg-gradient-primary px-8 pt-8 pb-6 text-center">
+              <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-gradient-gold shadow-glow">
+                <PartyPopper size={26} className="text-gold-foreground" />
               </div>
-              <div className="mt-1 font-mono text-2xl font-bold text-primary">{submitted}</div>
+              <h1 className="font-display text-2xl font-bold text-primary-foreground">
+                You're in!
+              </h1>
+              <p className="mt-1 text-sm text-primary-foreground/70">
+                A confirmation email and QR badge are on their way.
+              </p>
+
+              {paymentFailed && (
+                <div className="mt-4 rounded-xl bg-destructive/10 border border-destructive/20 p-4 text-left">
+                  <h3 className="font-semibold text-destructive mb-1 flex items-center gap-2">
+                    <AlertTriangle size={16} /> Payment Pending
+                  </h3>
+                  <p className="text-sm text-destructive/80">
+                    Your registration is saved, but we couldn't start the payment right now. You can
+                    pay later using the secure link in your confirmation email.
+                  </p>
+                </div>
+              )}
             </div>
-            <Link
-              to="/"
-              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
-            >
-              <ArrowLeft size={16} /> Back to home
-            </Link>
+
+            {/* Dashed divider — ticket tear */}
+            <div className="relative border-t border-dashed border-border/60">
+              <span className="absolute -left-3.5 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-secondary/40" />
+              <span className="absolute -right-3.5 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-secondary/40" />
+            </div>
+
+            {/* QR + ticket number body */}
+            <div className="px-8 py-8 text-center flex flex-col items-center gap-5">
+              {/* QR placeholder – shown when we have the ticket number */}
+              <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 shadow-soft">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://ameerexpo.com/verify/${submitted}&color=0C3E6F&bgcolor=FFFFFF`}
+                  alt={`QR code for ticket ${submitted}`}
+                  width={180}
+                  height={180}
+                  className="rounded-xl"
+                />
+              </div>
+
+              {/* Ticket number badge */}
+              <div className="rounded-xl border border-border/60 bg-card px-5 py-3 flex items-center justify-between">
+                <div className="text-left">
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                    Ticket Number
+                  </div>
+                  <div className="font-mono text-xl font-bold text-primary tracking-wider">
+                    {submitted}
+                  </div>
+                </div>
+                {paymentStatus === "paid" || paymentStatus === "free" ? (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-1">
+                    <ShieldCheck size={14} /> Verified
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1">
+                    <ShieldAlert size={14} /> Unverified
+                  </div>
+                )}
+              </div>
+
+              {/* Event details */}
+              <div className="w-full rounded-xl bg-secondary/40 px-4 py-3 text-sm text-muted-foreground text-left space-y-1">
+                <div className="flex items-center gap-2">
+                  <Calendar size={14} className="text-primary shrink-0" />
+                  <span>18–20 September 2026</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin size={14} className="text-primary shrink-0" />
+                  <span>Sarit Expo Centre, Westlands, Nairobi</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Dashed divider */}
+            <div className="relative border-t border-dashed border-border/60">
+              <span className="absolute -left-3.5 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-secondary/40" />
+              <span className="absolute -right-3.5 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-secondary/40" />
+            </div>
+
+            {/* Action buttons */}
+            <div className="px-8 py-7 flex flex-col items-center gap-3">
+              {submittedId && (
+                <div className="flex flex-wrap justify-center gap-3 w-full">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await downloadTicketPdf({ data: { id: submittedId } });
+                        if (res.success && res.base64) {
+                          const link = document.createElement("a");
+                          link.href = `data:application/pdf;base64,${res.base64}`;
+                          link.download = res.filename || `AmeerExpo-${submitted}.pdf`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        alert("Failed to download PDF ticket. Please try again.");
+                      }
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-gold px-5 py-3 text-sm font-semibold text-gold-foreground shadow-glow hover:-translate-y-0.5 transition-all"
+                  >
+                    <Download size={16} /> Download PDF
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await downloadTicketIcs({ data: { id: submittedId } });
+                        if (res.success && res.text) {
+                          const blob = new Blob([res.text], {
+                            type: "text/calendar;charset=utf-8",
+                          });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = res.filename || "AmeerExpo2026.ics";
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        alert("Failed to download calendar event. Please try again.");
+                      }
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-gold px-5 py-3 text-sm font-semibold text-gold-foreground shadow-glow hover:-translate-y-0.5 transition-all"
+                  >
+                    <Calendar size={16} /> Add to Calendar
+                  </button>
+                </div>
+              )}
+              <Link
+                to="/"
+                onClick={() => {
+                  clearDraft();
+                  setSubmitted(null);
+                  setSubmittedId(null);
+                }}
+                className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                Back to home
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Type gate (first screen before the visitor wizard) ─────────────────────
+  if (!typeGateDone) {
+    return (
+      <RegistrationTypeGate
+        onContinue={(type) => {
+          if (type === "visitor") {
+            setTypeGateDone(true);
+          } else {
+            navigate({ to: "/exhibit", search: { type: type as "exhibitor" | "sponsor" } });
+          }
+        }}
+      />
+    );
+  }
+
+  // ── Main registration form ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-secondary/40">
       <TopBar />
       <div className="mx-auto max-w-5xl px-4 py-10 sm:py-16">
         {resumedAt && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-3 text-sm">
-            <div className="text-foreground">
-              <span className="font-semibold">Welcome back.</span>{" "}
-              <span className="text-muted-foreground">
-                We restored your progress from {new Date(resumedAt).toLocaleString()}.
+            <div className="flex items-center gap-2 text-foreground">
+              <CheckCircle2 size={15} className="text-primary shrink-0" />
+              <span>
+                <span className="font-semibold">Welcome back.</span>{" "}
+                <span className="text-muted-foreground">
+                  Progress restored from {new Date(resumedAt).toLocaleString()}.
+                </span>
               </span>
             </div>
             <button
@@ -499,53 +894,25 @@ function Register() {
             </button>
           </div>
         )}
+
         <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_340px]">
           <div className="flex flex-col gap-6">
-            {/* Stepper */}
-            <div className="rounded-3xl glass shadow-soft border border-border/60 p-6 sm:p-8">
-              <div className="flex items-center justify-between gap-2 overflow-x-auto">
-                {steps.map((s, i) => {
-                  const active = i === step;
-                  const done = i < step;
-                  return (
-                    <div key={s.key} className="flex items-center gap-2 min-w-fit">
-                      <div
-                        className={`grid h-10 w-10 place-items-center rounded-full text-sm font-semibold transition-all ${
-                          done
-                            ? "bg-gradient-primary text-primary-foreground"
-                            : active
-                              ? "bg-gradient-gold text-gold-foreground shadow-glow"
-                              : "bg-secondary text-muted-foreground"
-                        }`}
-                      >
-                        {done ? <Check size={16} /> : <s.icon size={16} />}
-                      </div>
-                      <span
-                        className={`hidden sm:inline text-xs font-medium ${
-                          active ? "text-foreground" : "text-muted-foreground"
-                        }`}
-                      >
-                        {s.label}
-                      </span>
-                      {i < steps.length - 1 && (
-                        <div className="hidden sm:block h-px w-6 bg-border" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-gradient-gold transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+            {/* Progress Indicator */}
+            <div className="rounded-2xl md:rounded-3xl glass shadow-soft border border-border/60 p-5 sm:p-7">
+              <StepIndicator currentStep={step} />
             </div>
 
-            {/* Step content */}
-            <div className="rounded-3xl bg-card border border-border/60 shadow-soft p-6 sm:p-10">
+            {/* Step content card */}
+            <div
+              className="rounded-2xl md:rounded-3xl bg-card border border-border/60 shadow-soft p-6 sm:p-10"
+              key={step}
+            >
               {step === 0 && (
-                <StepBlock title="Personal information" subtitle="Tell us who's attending.">
+                <StepBlock
+                  title="Personal information"
+                  subtitle="Tell us who's attending."
+                  icon={User}
+                >
                   <div className="grid gap-5 sm:grid-cols-2">
                     <Field label="First Name" required>
                       <input
@@ -573,14 +940,7 @@ function Register() {
                         <option>Prefer not to say</option>
                       </select>
                     </Field>
-                    <Field label="Date of Birth">
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={f.dob}
-                        onChange={(e) => set("dob", e.target.value)}
-                      />
-                    </Field>
+
                     <Field label="Passport / National ID">
                       <input
                         className={inputCls}
@@ -588,18 +948,28 @@ function Register() {
                         onChange={(e) => set("idNumber", e.target.value)}
                       />
                     </Field>
-                    <Field label="Country" required>
+                    <Field
+                      label="Country"
+                      required
+                      error={showPersonalError("country") ? personalErrors.country : undefined}
+                    >
                       <input
                         className={inputCls}
                         value={f.country}
                         onChange={(e) => set("country", e.target.value)}
+                        onBlur={() => setPersonalTouchedFields((s) => ({ ...s, country: true }))}
                       />
                     </Field>
-                    <Field label="City">
+                    <Field
+                      label="City"
+                      required
+                      error={showPersonalError("city") ? personalErrors.city : undefined}
+                    >
                       <input
                         className={inputCls}
                         value={f.city}
                         onChange={(e) => set("city", e.target.value)}
+                        onBlur={() => setPersonalTouchedFields((s) => ({ ...s, city: true }))}
                       />
                     </Field>
                     <Field label="Phone Number" required>
@@ -648,7 +1018,11 @@ function Register() {
               )}
 
               {step === 1 && (
-                <StepBlock title="Professional information" subtitle="Where do you work?">
+                <StepBlock
+                  title="Professional information"
+                  subtitle="Where do you work?"
+                  icon={Briefcase}
+                >
                   <div className="grid gap-5 sm:grid-cols-2">
                     <Field label="Company Name" required>
                       <input
@@ -711,57 +1085,10 @@ function Register() {
 
               {step === 2 && (
                 <StepBlock
-                  title="Areas of interest"
-                  subtitle="Pick everything you'd like to explore."
+                  title="Logistics & accommodation"
+                  subtitle="We'll handle the details."
+                  icon={MapPin}
                 >
-                  <div className="flex flex-wrap gap-2">
-                    {industries.map((i) => (
-                      <Chip
-                        key={i}
-                        active={f.interests.includes(i)}
-                        onClick={() => toggle("interests", i)}
-                      >
-                        {i}
-                      </Chip>
-                    ))}
-                  </div>
-                </StepBlock>
-              )}
-
-              {step === 3 && (
-                <StepBlock
-                  title="Networking preferences"
-                  subtitle="We'll match you with the right people."
-                >
-                  <div className="space-y-6">
-                    <Field label="Would you like to schedule B2B meetings?">
-                      <div className="flex gap-2">
-                        {["Yes", "No"].map((v) => (
-                          <Chip key={v} active={f.b2b === v} onClick={() => set("b2b", v)}>
-                            {v}
-                          </Chip>
-                        ))}
-                      </div>
-                    </Field>
-                    <Field label="Interested in meeting">
-                      <div className="flex flex-wrap gap-2">
-                        {networkingTargets.map((v) => (
-                          <Chip
-                            key={v}
-                            active={f.targets.includes(v)}
-                            onClick={() => toggle("targets", v)}
-                          >
-                            {v}
-                          </Chip>
-                        ))}
-                      </div>
-                    </Field>
-                  </div>
-                </StepBlock>
-              )}
-
-              {step === 4 && (
-                <StepBlock title="Logistics & accommodation" subtitle="We'll handle the details.">
                   <div className="grid gap-4 sm:grid-cols-3">
                     {[
                       { k: "hotel", label: "Need hotel booking?" },
@@ -812,52 +1139,119 @@ function Register() {
                 </StepBlock>
               )}
 
-              {step === 5 && (
-                <StepBlock title="Select your pass" subtitle="Choose your experience for the expo.">
+              {step === 3 && (
+                <StepBlock
+                  title="Select your pass"
+                  subtitle="Choose your experience for the expo."
+                  icon={Ticket}
+                >
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {[
-                      {
-                        id: "general",
-                        title: "General (Free)",
-                        desc: "Access to the main exhibition floor and open sessions.",
-                        price: 0,
-                      },
-                      {
-                        id: "vip",
-                        title: "VIP Pass",
-                        desc: "VIP lounge access, fast-track badge, gala dinner, and concierge.",
-                        price: 5000,
-                      },
-                    ].map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => set("passType", p.id)}
-                        className={`cursor-pointer rounded-2xl border p-5 text-left transition-all ${
-                          f.passType === p.id
-                            ? "border-primary bg-primary/5 shadow-soft ring-1 ring-primary"
-                            : "border-border bg-card hover:border-primary/40"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-display font-semibold">{p.title}</span>
-                          <span
-                            className={`h-5 w-5 grid place-items-center rounded-full border ${f.passType === p.id ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}
-                          >
-                            {f.passType === p.id && <Check size={12} />}
-                          </span>
+                    {/* General Pass */}
+                    <button
+                      onClick={() => set("passType", "general")}
+                      className={`relative cursor-pointer rounded-2xl border p-6 text-left transition-all duration-200 ${
+                        f.passType === "general"
+                          ? "border-primary bg-primary/5 shadow-soft ring-1 ring-primary"
+                          : "border-border bg-card hover:border-primary/40 hover:shadow-soft"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                            f.passType === "general"
+                              ? "bg-primary/10 text-primary"
+                              : "bg-secondary text-muted-foreground"
+                          }`}
+                        >
+                          <Ticket size={20} />
                         </div>
-                        <p className="mt-2 text-sm text-muted-foreground">{p.desc}</p>
-                        <div className="mt-4 font-bold text-foreground">
-                          {p.price === 0 ? "Free" : `KES ${p.price.toLocaleString()}`}
+                        <span
+                          className={`h-5 w-5 mt-0.5 grid place-items-center rounded-full border transition-all ${
+                            f.passType === "general"
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-border"
+                          }`}
+                        >
+                          {f.passType === "general" && <Check size={11} />}
+                        </span>
+                      </div>
+                      <div className="font-display text-lg font-semibold">General</div>
+                      <div className="mt-0.5 mb-4 text-xl font-bold text-primary">Free</div>
+                      <ul className="space-y-2">
+                        {[
+                          "Exhibition floor access",
+                          "Open conference sessions",
+                          "Networking events",
+                        ].map((b) => (
+                          <li key={b} className="flex items-center gap-2 text-sm text-foreground">
+                            <CheckCircle2 size={15} className="shrink-0 text-primary" />
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
+
+                    {/* VIP Pass */}
+                    <button
+                      onClick={() => set("passType", "vip")}
+                      className={`relative cursor-pointer rounded-2xl border-2 p-6 text-left transition-all duration-200 ${
+                        f.passType === "vip"
+                          ? "border-primary bg-primary/5 shadow-soft ring-1 ring-primary"
+                          : "border-border/80 bg-card hover:border-primary/40 hover:shadow-soft"
+                      }`}
+                    >
+                      {/* Subtle gold accent bar */}
+                      <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-gold opacity-80" />
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                            f.passType === "vip"
+                              ? "bg-gradient-gold text-gold-foreground shadow-glow"
+                              : "bg-secondary text-muted-foreground"
+                          }`}
+                        >
+                          <Crown size={20} />
                         </div>
-                      </button>
-                    ))}
+                        <span
+                          className={`h-5 w-5 mt-0.5 grid place-items-center rounded-full border transition-all ${
+                            f.passType === "vip"
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-border"
+                          }`}
+                        >
+                          {f.passType === "vip" && <Check size={11} />}
+                        </span>
+                      </div>
+                      <div className="font-display text-lg font-semibold">VIP Pass</div>
+                      <div className="mt-0.5 mb-1 text-xl font-bold text-primary">KES 5,000</div>
+                      <div className="mb-4 text-xs font-medium text-muted-foreground/80">
+                        Pay via M-Pesa or card
+                      </div>
+                      <ul className="space-y-2">
+                        {[
+                          "Everything in General",
+                          "VIP lounge access",
+                          "Fast-track badge",
+                          "Gala dinner invitation",
+                          "Dedicated concierge",
+                        ].map((b) => (
+                          <li key={b} className="flex items-center gap-2 text-sm text-foreground">
+                            <CheckCircle2 size={15} className="shrink-0 text-primary" />
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
                   </div>
                 </StepBlock>
               )}
 
-              {step === 6 && (
-                <StepBlock title="Review & confirm" subtitle="Everything look right?">
+              {step === 4 && (
+                <StepBlock
+                  title="Review & confirm"
+                  subtitle="Everything look right?"
+                  icon={ClipboardCheck}
+                >
                   <div className="rounded-2xl bg-secondary/50 p-5 sm:p-6 grid gap-4 sm:grid-cols-2 text-sm">
                     <Sum label="Name" value={`${f.firstName} ${f.lastName}`} />
                     <Sum label="Email" value={f.email} />
@@ -870,9 +1264,6 @@ function Register() {
                     <Sum label="Role" value={f.jobTitle} />
                     <Sum label="Business Type" value={f.businessType} />
                     <Sum label="Industry" value={f.industry} />
-                    <Sum label="Interests" value={f.interests.join(", ") || "—"} />
-                    <Sum label="B2B Meetings" value={f.b2b || "—"} />
-                    <Sum label="Meeting" value={f.targets.join(", ") || "—"} />
                     <Sum
                       label="Logistics"
                       value={
@@ -895,14 +1286,15 @@ function Register() {
                     />
                     <span>
                       I accept the{" "}
-                      <a href="#" className="text-primary underline">
+                      <Link to="/terms" target="_blank" className="text-primary underline">
                         terms & conditions
-                      </a>{" "}
+                      </Link>{" "}
                       and consent to receive event communications.
                     </span>
                   </label>
+
                   <div className="mt-4 rounded-xl border border-dashed border-border bg-secondary/40 px-4 py-3 text-xs text-muted-foreground">
-                    Protected by CAPTCHA · Your data is encrypted in transit.
+                    Your data is encrypted in transit.
                   </div>
                 </StepBlock>
               )}
@@ -914,32 +1306,41 @@ function Register() {
                   disabled={step === 0}
                   className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm font-medium disabled:opacity-40 hover:border-primary/40 transition-colors"
                 >
-                  <ArrowLeft size={16} /> Back
+                  <ArrowLeft size={16} /> {t("Back")}
                 </button>
                 {step < steps.length - 1 ? (
                   <button
-                    onClick={() => canNext() && setStep((s) => s + 1)}
+                    onClick={() => {
+                      if (step === 0) setPersonalValidationAttempted(true);
+                      if (canNext()) setStep((s) => s + 1);
+                    }}
                     disabled={!canNext()}
                     className="inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 shadow-soft hover:-translate-y-0.5 transition-all"
                   >
-                    Continue <ArrowRight size={16} />
+                    {t("Continue")} <ArrowRight size={16} />
                   </button>
                 ) : (
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-end gap-2">
                     {submitError && (
-                      <span className="text-sm font-medium text-destructive">{submitError}</span>
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-destructive">
+                        <AlertCircle size={14} className="shrink-0" />
+                        {submitError}
+                      </span>
                     )}
                     <button
                       onClick={submit}
                       disabled={!f.terms || isSubmitting}
                       className="inline-flex items-center gap-2 rounded-xl bg-gradient-gold px-6 py-3 text-sm font-semibold text-gold-foreground shadow-glow disabled:opacity-50 hover:-translate-y-0.5 transition-all"
                     >
-                      {isSubmitting
-                        ? "Submitting..."
-                        : f.passType === "vip"
-                          ? "Proceed to Payment"
-                          : "Complete Registration"}{" "}
-                      <Check size={16} />
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> {t("Submitting…")}
+                        </>
+                      ) : f.passType === "vip" ? (
+                        t("Proceed to Payment")
+                      ) : (
+                        t("Complete Registration")
+                      )}
                     </button>
                   </div>
                 )}
@@ -953,13 +1354,14 @@ function Register() {
           </div>
 
           <div className="order-first lg:order-last">
-            <div className="sticky top-24 rounded-3xl bg-card border border-border/60 shadow-soft p-6">
+            <div className="sticky top-24 rounded-2xl md:rounded-3xl bg-card border border-border/60 shadow-soft p-6">
               <h3 className="font-display font-semibold mb-4 text-lg text-foreground">
                 Experience Ameer Expo
               </h3>
               <VideoEmbed
-                // TODO: replace with real promo video ID
-                caption="Join industry leaders in shaping the future."
+                youtubeId="1wxUUTY-c48"
+                caption="Ameer Expo Africa & Middle East Highlights"
+                autoPlay
               />
               <div className="mt-6 rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground">
                 <p>
@@ -975,19 +1377,28 @@ function Register() {
   );
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ──────────────────────────────────────────────────────────────────────────────
 function StepBlock({
   title,
   subtitle,
+  icon: Icon,
   children,
 }: {
   title: string;
   subtitle: string;
+  icon: React.ElementType;
   children: React.ReactNode;
 }) {
+  const t = (s: string) => s;
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">{title}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
+      <div className="flex items-center gap-3 mb-1">
+        <Icon size={24} className="text-primary shrink-0" />
+        <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground">{t(title)}</h2>
+      </div>
+      <p className="ml-9 text-sm text-muted-foreground">{t(subtitle)}</p>
       <div className="mt-8">{children}</div>
     </div>
   );
@@ -1008,7 +1419,7 @@ function TopBar() {
       <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
           <img
-            src={logo.url}
+            src={logo}
             alt="Ameer Expo"
             className="h-9 w-9 object-contain"
             width={36}
@@ -1021,9 +1432,12 @@ function TopBar() {
             </div>
           </div>
         </Link>
-        <Link to="/" className="text-sm text-muted-foreground hover:text-primary">
-          Save & exit
-        </Link>
+        <div className="flex items-center gap-4">
+          <LanguageSwitcher />
+          <Link to="/" className="text-sm text-muted-foreground hover:text-primary">
+            Save & exit
+          </Link>
+        </div>
       </div>
     </div>
   );

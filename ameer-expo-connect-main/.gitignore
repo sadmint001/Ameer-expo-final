@@ -1,4 +1,4 @@
-# Logs
+﻿# Logs
 logs
 *.log
 npm-debug.log*
@@ -32,3 +32,12 @@ dist-ssr
 *.sw?
 .env
 data/
+# AI tooling - never commit
+.agents/
+.claude/
+.cursor/
+.windsurf/
+.aider*
+CLAUDE.md
+AGENTS.md
+.github/copilot-instructions.md
